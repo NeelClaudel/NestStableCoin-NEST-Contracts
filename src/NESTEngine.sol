@@ -1,25 +1,3 @@
-// Layout of Contract:
-// version
-// imports
-// errors
-// interfaces, libraries, contracts
-// Type declarations
-// State variables
-// Events
-// Modifiers
-// Functions
-
-// Layout of Functions:
-// constructor
-// receive function (if exists)
-// fallback function (if exists)
-// external
-// public
-// internal
-// private
-// internal & private view & pure functions
-// external & public view & pure functions
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.19;
@@ -27,11 +5,11 @@ pragma solidity 0.8.19;
 import {OracleLib, AggregatorV3Interface} from "./libraries/OracleLib.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
+import {NestStableCoin} from "./NestStableCoin.sol";
 
 /*
- * @title DSCEngine
- * @author Patrick Collins
+ * @title NESTEngine
+ * @author Neel Claudel
  *
  * The system is designed to be as minimal as possible, and have the tokens maintain a 1 token == $1 peg at all times.
  * This is a stablecoin with the properties:
@@ -41,22 +19,22 @@ import {DecentralizedStableCoin} from "./DecentralizedStableCoin.sol";
  *
  * It is similar to DAI if DAI had no governance, no fees, and was backed by only WETH and WBTC.
  *
- * @notice This contract is the core of the Decentralized Stablecoin system. It handles all the logic
- * for minting and redeeming DSC, as well as depositing and withdrawing collateral.
+ * @notice This contract is the core of the Nest Stablecoin system. It handles all the logic
+ * for minting and redeeming NEST, as well as depositing and withdrawing collateral.
  * @notice This contract is based on the MakerDAO DSS system
  */
-contract DSCEngine is ReentrancyGuard {
+contract NESTEngine is ReentrancyGuard {
     ///////////////////
     // Errors
     ///////////////////
-    error DSCEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
-    error DSCEngine__NeedsMoreThanZero();
-    error DSCEngine__TokenNotAllowed(address token);
-    error DSCEngine__TransferFailed();
-    error DSCEngine__BreaksHealthFactor(uint256 healthFactorValue);
-    error DSCEngine__MintFailed();
-    error DSCEngine__HealthFactorOk();
-    error DSCEngine__HealthFactorNotImproved();
+    error NESTEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
+    error NESTEngine__NeedsMoreThanZero();
+    error NESTEngine__TokenNotAllowed(address token);
+    error NESTEngine__TransferFailed();
+    error NESTEngine__BreaksHealthFactor(uint256 healthFactorValue);
+    error NESTEngine__MintFailed();
+    error NESTEngine__HealthFactorOk();
+    error NESTEngine__HealthFactorNotImproved();
 
     ///////////////////
     // Types
@@ -66,7 +44,7 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////
     // State Variables
     ///////////////////
-    DecentralizedStableCoin private immutable i_dsc;
+    NestStableCoin private immutable i_nest;
 
     uint256 private constant LIQUIDATION_THRESHOLD = 50; // This means you need to be 200% over-collateralized
     uint256 private constant LIQUIDATION_BONUS = 10; // This means you get assets at a 10% discount when liquidating
@@ -80,8 +58,8 @@ contract DSCEngine is ReentrancyGuard {
     mapping(address collateralToken => address priceFeed) private s_priceFeeds;
     /// @dev Amount of collateral deposited by user
     mapping(address user => mapping(address collateralToken => uint256 amount)) private s_collateralDeposited;
-    /// @dev Amount of DSC minted by user
-    mapping(address user => uint256 amount) private s_DSCMinted;
+    /// @dev Amount of NEST minted by user
+    mapping(address user => uint256 amount) private s_NESTMinted;
     /// @dev If we know exactly how many tokens we have, we could make this immutable!
     address[] private s_collateralTokens;
 
@@ -96,14 +74,14 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////
     modifier moreThanZero(uint256 amount) {
         if (amount == 0) {
-            revert DSCEngine__NeedsMoreThanZero();
+            revert NESTEngine__NeedsMoreThanZero();
         }
         _;
     }
 
     modifier isAllowedToken(address token) {
         if (s_priceFeeds[token] == address(0)) {
-            revert DSCEngine__TokenNotAllowed(token);
+            revert NESTEngine__TokenNotAllowed(token);
         }
         _;
     }
@@ -111,9 +89,9 @@ contract DSCEngine is ReentrancyGuard {
     ///////////////////
     // Functions
     ///////////////////
-    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address dscAddress) {
+    constructor(address[] memory tokenAddresses, address[] memory priceFeedAddresses, address nestAddress) {
         if (tokenAddresses.length != priceFeedAddresses.length) {
-            revert DSCEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
+            revert NESTEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch();
         }
         // These feeds will be the USD pairs
         // For example ETH / USD or MKR / USD
@@ -121,7 +99,7 @@ contract DSCEngine is ReentrancyGuard {
             s_priceFeeds[tokenAddresses[i]] = priceFeedAddresses[i];
             s_collateralTokens.push(tokenAddresses[i]);
         }
-        i_dsc = DecentralizedStableCoin(dscAddress);
+        i_nest = NestStableCoin(nestAddress);
     }
 
     ///////////////////
@@ -130,8 +108,8 @@ contract DSCEngine is ReentrancyGuard {
     /*
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
      * @param amountCollateral: The amount of collateral you're depositing
-     * @param amountDscToMint: The amount of DSC you want to mint
-     * @notice This function will deposit your collateral and mint DSC in one transaction
+     * @param amountDscToMint: The amount of NEST you want to mint
+     * @notice This function will deposit your collateral and mint NEST in one transaction
      */
     function depositCollateralAndMintDsc(
         address tokenCollateralAddress,
@@ -145,8 +123,8 @@ contract DSCEngine is ReentrancyGuard {
     /*
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
      * @param amountCollateral: The amount of collateral you're depositing
-     * @param amountDscToBurn: The amount of DSC you want to burn
-     * @notice This function will withdraw your collateral and burn DSC in one transaction
+     * @param amountDscToBurn: The amount of NEST you want to burn
+     * @notice This function will withdraw your collateral and burn NEST in one transaction
      */
     function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
         external
@@ -161,7 +139,7 @@ contract DSCEngine is ReentrancyGuard {
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're redeeming
      * @param amountCollateral: The amount of collateral you're redeeming
      * @notice This function will redeem your collateral.
-     * @notice If you have DSC minted, you will not be able to redeem until you burn your DSC
+     * @notice If you have NEST minted, you will not be able to redeem until you burn your NEST
      */
     function redeemCollateral(address tokenCollateralAddress, uint256 amountCollateral)
         external
@@ -173,9 +151,9 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     /*
-     * @notice careful! You'll burn your DSC here! Make sure you want to do this...
+     * @notice careful! You'll burn your NEST here! Make sure you want to do this...
      * @dev you might want to use this if you're nervous you might get liquidated and want to just burn
-     * you DSC but keep your collateral in.
+     * you NEST but keep your collateral in.
      */
     function burnDsc(uint256 amount) external moreThanZero(amount) {
         _burnDsc(amount, msg.sender, msg.sender);
@@ -185,9 +163,9 @@ contract DSCEngine is ReentrancyGuard {
     /*
      * @param collateral: The ERC20 token address of the collateral you're using to make the protocol solvent again.
      * This is collateral that you're going to take from the user who is insolvent.
-     * In return, you have to burn your DSC to pay off their debt, but you don't pay off your own.
+     * In return, you have to burn your NEST to pay off their debt, but you don't pay off your own.
      * @param user: The user who is insolvent. They have to have a _healthFactor below MIN_HEALTH_FACTOR
-     * @param debtToCover: The amount of DSC you want to burn to cover the user's debt.
+     * @param debtToCover: The amount of NEST you want to burn to cover the user's debt.
      *
      * @notice: You can partially liquidate a user.
      * @notice: You will get a 10% LIQUIDATION_BONUS for taking the users funds.
@@ -202,16 +180,16 @@ contract DSCEngine is ReentrancyGuard {
     {
         uint256 startingUserHealthFactor = _healthFactor(user);
         if (startingUserHealthFactor >= MIN_HEALTH_FACTOR) {
-            revert DSCEngine__HealthFactorOk();
+            revert NESTEngine__HealthFactorOk();
         }
-        // If covering 100 DSC, we need to $100 of collateral
+        // If covering 100 NEST, we need to $100 of collateral
         uint256 tokenAmountFromDebtCovered = getTokenAmountFromUsd(collateral, debtToCover);
         // And give them a 10% bonus
-        // So we are giving the liquidator $110 of WETH for 100 DSC
+        // So we are giving the liquidator $110 of WETH for 100 NEST
         // We should implement a feature to liquidate in the event the protocol is insolvent
         // And sweep extra amounts into a treasury
         uint256 bonusCollateral = (tokenAmountFromDebtCovered * LIQUIDATION_BONUS) / LIQUIDATION_PRECISION;
-        // Burn DSC equal to debtToCover
+        // Burn NEST equal to debtToCover
         // Figure out how much collateral to recover based on how much burnt
         _redeemCollateral(collateral, tokenAmountFromDebtCovered + bonusCollateral, user, msg.sender);
         _burnDsc(debtToCover, user, msg.sender);
@@ -219,7 +197,7 @@ contract DSCEngine is ReentrancyGuard {
         uint256 endingUserHealthFactor = _healthFactor(user);
         // This conditional should never hit, but just in case
         if (endingUserHealthFactor <= startingUserHealthFactor) {
-            revert DSCEngine__HealthFactorNotImproved();
+            revert NESTEngine__HealthFactorNotImproved();
         }
         revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -228,16 +206,16 @@ contract DSCEngine is ReentrancyGuard {
     // Public Functions
     ///////////////////
     /*
-     * @param amountDscToMint: The amount of DSC you want to mint
-     * You can only mint DSC if you hav enough collateral
+     * @param amountDscToMint: The amount of NEST you want to mint
+     * You can only mint NEST if you hav enough collateral
      */
     function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
-        s_DSCMinted[msg.sender] += amountDscToMint;
+        s_NESTMinted[msg.sender] += amountDscToMint;
         revertIfHealthFactorIsBroken(msg.sender);
-        bool minted = i_dsc.mint(msg.sender, amountDscToMint);
+        bool minted = i_nest.mint(msg.sender, amountDscToMint);
 
         if (minted != true) {
-            revert DSCEngine__MintFailed();
+            revert NESTEngine__MintFailed();
         }
     }
 
@@ -255,7 +233,7 @@ contract DSCEngine is ReentrancyGuard {
         emit CollateralDeposited(msg.sender, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transferFrom(msg.sender, address(this), amountCollateral);
         if (!success) {
-            revert DSCEngine__TransferFailed();
+            revert NESTEngine__TransferFailed();
         }
     }
 
@@ -269,19 +247,19 @@ contract DSCEngine is ReentrancyGuard {
         emit CollateralRedeemed(from, to, tokenCollateralAddress, amountCollateral);
         bool success = IERC20(tokenCollateralAddress).transfer(to, amountCollateral);
         if (!success) {
-            revert DSCEngine__TransferFailed();
+            revert NESTEngine__TransferFailed();
         }
     }
 
-    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address dscFrom) private {
-        s_DSCMinted[onBehalfOf] -= amountDscToBurn;
+    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address nestFrom) private {
+        s_NESTMinted[onBehalfOf] -= amountDscToBurn;
 
-        bool success = i_dsc.transferFrom(dscFrom, address(this), amountDscToBurn);
+        bool success = i_nest.transferFrom(nestFrom, address(this), amountDscToBurn);
         // This conditional is hypothetically unreachable
         if (!success) {
-            revert DSCEngine__TransferFailed();
+            revert NESTEngine__TransferFailed();
         }
-        i_dsc.burn(amountDscToBurn);
+        i_nest.burn(amountDscToBurn);
     }
 
     //////////////////////////////
@@ -293,7 +271,7 @@ contract DSCEngine is ReentrancyGuard {
         view
         returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
     {
-        totalDscMinted = s_DSCMinted[user];
+        totalDscMinted = s_NESTMinted[user];
         collateralValueInUsd = getAccountCollateralValue(user);
     }
 
@@ -325,7 +303,7 @@ contract DSCEngine is ReentrancyGuard {
     function revertIfHealthFactorIsBroken(address user) internal view {
         uint256 userHealthFactor = _healthFactor(user);
         if (userHealthFactor < MIN_HEALTH_FACTOR) {
-            revert DSCEngine__BreaksHealthFactor(userHealthFactor);
+            revert NESTEngine__BreaksHealthFactor(userHealthFactor);
         }
     }
 
@@ -409,7 +387,7 @@ contract DSCEngine is ReentrancyGuard {
     }
 
     function getDsc() external view returns (address) {
-        return address(i_dsc);
+        return address(i_nest);
     }
 
     function getCollateralTokenPriceFeed(address token) external view returns (address) {
@@ -420,3 +398,25 @@ contract DSCEngine is ReentrancyGuard {
         return _healthFactor(user);
     }
 }
+
+// Layout of Contract:
+// version
+// imports
+// errors
+// interfaces, libraries, contracts
+// Type declarations
+// State variables
+// Events
+// Modifiers
+// Functions
+
+// Layout of Functions:
+// constructor
+// receive function (if exists)
+// fallback function (if exists)
+// external
+// public
+// internal
+// private
+// internal & private view & pure functions
+// external & public view & pure functions

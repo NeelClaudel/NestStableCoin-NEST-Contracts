@@ -2,24 +2,24 @@
 
 pragma solidity 0.8.19;
 
-import {DeployDSC} from "../../script/DeployDSC.s.sol";
-import {DSCEngine} from "../../src/DSCEngine.sol";
-import {DecentralizedStableCoin} from "../../src/DecentralizedStableCoin.sol";
+import {DeployNEST} from "../../script/DeployNEST.s.sol";
+import {NESTEngine} from "../../src/NESTEngine.sol";
+import {NestStableCoin} from "../../src/NestStableCoin.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 import {MockV3Aggregator} from "../mocks/MockV3Aggregator.sol";
-import {MockMoreDebtDSC} from "../mocks/MockMoreDebtDSC.sol";
-import {MockFailedMintDSC} from "../mocks/MockFailedMintDSC.sol";
+import {MockMoreDebtNEST} from "../mocks/MockMoreDebtNEST.sol";
+import {MockFailedMintNEST} from "../mocks/MockFailedMintNEST.sol";
 import {MockFailedTransferFrom} from "../mocks/MockFailedTransferFrom.sol";
 import {MockFailedTransfer} from "../mocks/MockFailedTransfer.sol";
 import {Test, console} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
-contract DSCEngineTest is StdCheats, Test {
+contract NESTEngineTest is StdCheats, Test {
     event CollateralRedeemed(address indexed redeemFrom, address indexed redeemTo, address token, uint256 amount); // if redeemFrom != redeemedTo, then it was liquidated
 
-    DSCEngine public dsce;
-    DecentralizedStableCoin public dsc;
+    NESTEngine public neste;
+    NestStableCoin public nest;
     HelperConfig public helperConfig;
 
     address public ethUsdPriceFeed;
@@ -41,8 +41,8 @@ contract DSCEngineTest is StdCheats, Test {
     uint256 public collateralToCover = 20 ether;
 
     function setUp() external {
-        DeployDSC deployer = new DeployDSC();
-        (dsc, dsce, helperConfig) = deployer.run();
+        DeployNEST deployer = new DeployNEST();
+        (nest, neste, helperConfig) = deployer.run();
         (ethUsdPriceFeed, btcUsdPriceFeed, weth, wbtc, deployerKey) = helperConfig.activeNetworkConfig();
         if (block.chainid == 31337) {
             vm.deal(user, STARTING_USER_BALANCE);
@@ -75,8 +75,8 @@ contract DSCEngineTest is StdCheats, Test {
         feedAddresses.push(ethUsdPriceFeed);
         feedAddresses.push(btcUsdPriceFeed);
 
-        vm.expectRevert(DSCEngine.DSCEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch.selector);
-        new DSCEngine(tokenAddresses, feedAddresses, address(dsc));
+        vm.expectRevert(NESTEngine.NESTEngine__TokenAddressesAndPriceFeedAddressesAmountsDontMatch.selector);
+        new NESTEngine(tokenAddresses, feedAddresses, address(nest));
     }
 
     //////////////////
@@ -86,7 +86,7 @@ contract DSCEngineTest is StdCheats, Test {
     function testGetTokenAmountFromUsd() public {
         // If we want $100 of WETH @ $2000/WETH, that would be 0.05 WETH
         uint256 expectedWeth = 0.05 ether;
-        uint256 amountWeth = dsce.getTokenAmountFromUsd(weth, 100 ether);
+        uint256 amountWeth = neste.getTokenAmountFromUsd(weth, 100 ether);
         assertEq(amountWeth, expectedWeth);
     }
 
@@ -94,7 +94,7 @@ contract DSCEngineTest is StdCheats, Test {
         uint256 ethAmount = 15e18;
         // 15e18 ETH * $2000/ETH = $30,000e18
         uint256 expectedUsd = 30000e18;
-        uint256 usdValue = dsce.getUsdValue(weth, ethAmount);
+        uint256 usdValue = neste.getUsdValue(weth, ethAmount);
         assertEq(usdValue, expectedUsd);
     }
 
@@ -111,7 +111,7 @@ contract DSCEngineTest is StdCheats, Test {
         tokenAddresses = [address(mockDsc)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
+        NESTEngine mockDsce = new NESTEngine(
             tokenAddresses,
             feedAddresses,
             address(mockDsc)
@@ -124,44 +124,44 @@ contract DSCEngineTest is StdCheats, Test {
         vm.startPrank(user);
         ERC20Mock(address(mockDsc)).approve(address(mockDsce), amountCollateral);
         // Act / Assert
-        vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+        vm.expectRevert(NESTEngine.NESTEngine__TransferFailed.selector);
         mockDsce.depositCollateral(address(mockDsc), amountCollateral);
         vm.stopPrank();
     }
 
     function testRevertsIfCollateralZero() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
 
-        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
-        dsce.depositCollateral(weth, 0);
+        vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
+        neste.depositCollateral(weth, 0);
         vm.stopPrank();
     }
 
     function testRevertsWithUnapprovedCollateral() public {
         ERC20Mock randToken = new ERC20Mock("RAN", "RAN", user, 100e18);
         vm.startPrank(user);
-        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__TokenNotAllowed.selector, address(randToken)));
-        dsce.depositCollateral(address(randToken), amountCollateral);
+        vm.expectRevert(abi.encodeWithSelector(NESTEngine.NESTEngine__TokenNotAllowed.selector, address(randToken)));
+        neste.depositCollateral(address(randToken), amountCollateral);
         vm.stopPrank();
     }
 
     modifier depositedCollateral() {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateral(weth, amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateral(weth, amountCollateral);
         vm.stopPrank();
         _;
     }
 
     function testCanDepositCollateralWithoutMinting() public depositedCollateral {
-        uint256 userBalance = dsc.balanceOf(user);
+        uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, 0);
     }
 
     function testCanDepositedCollateralAndGetAccountInfo() public depositedCollateral {
-        (uint256 totalDscMinted, uint256 collateralValueInUsd) = dsce.getAccountInformation(user);
-        uint256 expectedDepositedAmount = dsce.getTokenAmountFromUsd(weth, collateralValueInUsd);
+        (uint256 totalDscMinted, uint256 collateralValueInUsd) = neste.getAccountInformation(user);
+        uint256 expectedDepositedAmount = neste.getTokenAmountFromUsd(weth, collateralValueInUsd);
         assertEq(totalDscMinted, 0);
         assertEq(expectedDepositedAmount, amountCollateral);
     }
@@ -172,27 +172,27 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testRevertsIfMintedDscBreaksHealthFactor() public {
         (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
-        amountToMint = (amountCollateral * (uint256(price) * dsce.getAdditionalFeedPrecision())) / dsce.getPrecision();
+        amountToMint = (amountCollateral * (uint256(price) * neste.getAdditionalFeedPrecision())) / neste.getPrecision();
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
 
         uint256 expectedHealthFactor =
-            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, amountCollateral));
-        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+            neste.calculateHealthFactor(amountToMint, neste.getUsdValue(weth, amountCollateral));
+        vm.expectRevert(abi.encodeWithSelector(NESTEngine.NESTEngine__BreaksHealthFactor.selector, expectedHealthFactor));
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
     }
 
     modifier depositedCollateralAndMintedDsc() {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
         _;
     }
 
     function testCanMintWithDepositedCollateral() public depositedCollateralAndMintedDsc {
-        uint256 userBalance = dsc.balanceOf(user);
+        uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, amountToMint);
     }
 
@@ -202,12 +202,12 @@ contract DSCEngineTest is StdCheats, Test {
     // This test needs it's own custom setup
     function testRevertsIfMintFails() public {
         // Arrange - Setup
-        MockFailedMintDSC mockDsc = new MockFailedMintDSC();
+        MockFailedMintNEST mockDsc = new MockFailedMintNEST();
         tokenAddresses = [weth];
         feedAddresses = [ethUsdPriceFeed];
         address owner = msg.sender;
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
+        NESTEngine mockDsce = new NESTEngine(
             tokenAddresses,
             feedAddresses,
             address(mockDsc)
@@ -217,17 +217,17 @@ contract DSCEngineTest is StdCheats, Test {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
 
-        vm.expectRevert(DSCEngine.DSCEngine__MintFailed.selector);
+        vm.expectRevert(NESTEngine.NESTEngine__MintFailed.selector);
         mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
     }
 
     function testRevertsIfMintAmountIsZero() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
-        dsce.mintDsc(0);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
+        neste.mintDsc(0);
         vm.stopPrank();
     }
 
@@ -235,24 +235,24 @@ contract DSCEngineTest is StdCheats, Test {
         // 0xe580cc6100000000000000000000000000000000000000000000000006f05b59d3b20000
         // 0xe580cc6100000000000000000000000000000000000000000000003635c9adc5dea00000
         (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
-        amountToMint = (amountCollateral * (uint256(price) * dsce.getAdditionalFeedPrecision())) / dsce.getPrecision();
+        amountToMint = (amountCollateral * (uint256(price) * neste.getAdditionalFeedPrecision())) / neste.getPrecision();
 
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateral(weth, amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateral(weth, amountCollateral);
 
         uint256 expectedHealthFactor =
-            dsce.calculateHealthFactor(amountToMint, dsce.getUsdValue(weth, amountCollateral));
-        vm.expectRevert(abi.encodeWithSelector(DSCEngine.DSCEngine__BreaksHealthFactor.selector, expectedHealthFactor));
-        dsce.mintDsc(amountToMint);
+            neste.calculateHealthFactor(amountToMint, neste.getUsdValue(weth, amountCollateral));
+        vm.expectRevert(abi.encodeWithSelector(NESTEngine.NESTEngine__BreaksHealthFactor.selector, expectedHealthFactor));
+        neste.mintDsc(amountToMint);
         vm.stopPrank();
     }
 
     function testCanMintDsc() public depositedCollateral {
         vm.prank(user);
-        dsce.mintDsc(amountToMint);
+        neste.mintDsc(amountToMint);
 
-        uint256 userBalance = dsc.balanceOf(user);
+        uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, amountToMint);
     }
 
@@ -262,26 +262,26 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testRevertsIfBurnAmountIsZero() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
-        dsce.burnDsc(0);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
+        neste.burnDsc(0);
         vm.stopPrank();
     }
 
     function testCantBurnMoreThanUserHas() public {
         vm.prank(user);
         vm.expectRevert();
-        dsce.burnDsc(1);
+        neste.burnDsc(1);
     }
 
     function testCanBurnDsc() public depositedCollateralAndMintedDsc {
         vm.startPrank(user);
-        dsc.approve(address(dsce), amountToMint);
-        dsce.burnDsc(amountToMint);
+        nest.approve(address(neste), amountToMint);
+        neste.burnDsc(amountToMint);
         vm.stopPrank();
 
-        uint256 userBalance = dsc.balanceOf(user);
+        uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, 0);
     }
 
@@ -298,7 +298,7 @@ contract DSCEngineTest is StdCheats, Test {
         tokenAddresses = [address(mockDsc)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
+        NESTEngine mockDsce = new NESTEngine(
             tokenAddresses,
             feedAddresses,
             address(mockDsc)
@@ -312,33 +312,33 @@ contract DSCEngineTest is StdCheats, Test {
         ERC20Mock(address(mockDsc)).approve(address(mockDsce), amountCollateral);
         // Act / Assert
         mockDsce.depositCollateral(address(mockDsc), amountCollateral);
-        vm.expectRevert(DSCEngine.DSCEngine__TransferFailed.selector);
+        vm.expectRevert(NESTEngine.NESTEngine__TransferFailed.selector);
         mockDsce.redeemCollateral(address(mockDsc), amountCollateral);
         vm.stopPrank();
     }
 
     function testRevertsIfRedeemAmountIsZero() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
-        dsce.redeemCollateral(weth, 0);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
+        neste.redeemCollateral(weth, 0);
         vm.stopPrank();
     }
 
     function testCanRedeemCollateral() public depositedCollateral {
         vm.startPrank(user);
-        dsce.redeemCollateral(weth, amountCollateral);
+        neste.redeemCollateral(weth, amountCollateral);
         uint256 userBalance = ERC20Mock(weth).balanceOf(user);
         assertEq(userBalance, amountCollateral);
         vm.stopPrank();
     }
 
     function testEmitCollateralRedeemedWithCorrectArgs() public depositedCollateral {
-        vm.expectEmit(true, true, true, true, address(dsce));
+        vm.expectEmit(true, true, true, true, address(neste));
         emit CollateralRedeemed(user, user, weth, amountCollateral);
         vm.startPrank(user);
-        dsce.redeemCollateral(weth, amountCollateral);
+        neste.redeemCollateral(weth, amountCollateral);
         vm.stopPrank();
     }
     ///////////////////////////////////
@@ -347,21 +347,21 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testMustRedeemMoreThanZero() public depositedCollateralAndMintedDsc {
         vm.startPrank(user);
-        dsc.approve(address(dsce), amountToMint);
-        vm.expectRevert(DSCEngine.DSCEngine__NeedsMoreThanZero.selector);
-        dsce.redeemCollateralForDsc(weth, 0, amountToMint);
+        nest.approve(address(neste), amountToMint);
+        vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
+        neste.redeemCollateralForDsc(weth, 0, amountToMint);
         vm.stopPrank();
     }
 
     function testCanRedeemDepositedCollateral() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
-        dsc.approve(address(dsce), amountToMint);
-        dsce.redeemCollateralForDsc(weth, amountCollateral, amountToMint);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        nest.approve(address(neste), amountToMint);
+        neste.redeemCollateralForDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
 
-        uint256 userBalance = dsc.balanceOf(user);
+        uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, 0);
     }
 
@@ -371,7 +371,7 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testProperlyReportsHealthFactor() public depositedCollateralAndMintedDsc {
         uint256 expectedHealthFactor = 100 ether;
-        uint256 healthFactor = dsce.getHealthFactor(user);
+        uint256 healthFactor = neste.getHealthFactor(user);
         // $100 minted with $20,000 collateral at 50% liquidation threshold
         // means that we must have $200 collatareral at all times.
         // 20,000 * 0.5 = 10,000
@@ -385,7 +385,7 @@ contract DSCEngineTest is StdCheats, Test {
 
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
 
-        uint256 userHealthFactor = dsce.getHealthFactor(user);
+        uint256 userHealthFactor = neste.getHealthFactor(user);
         // $180 collateral / 200 debt = 0.9
         assert(userHealthFactor == 0.9 ether);
     }
@@ -397,12 +397,12 @@ contract DSCEngineTest is StdCheats, Test {
     // This test needs it's own setup
     function testMustImproveHealthFactorOnLiquidation() public {
         // Arrange - Setup
-        MockMoreDebtDSC mockDsc = new MockMoreDebtDSC(ethUsdPriceFeed);
+        MockMoreDebtNEST mockDsc = new MockMoreDebtNEST(ethUsdPriceFeed);
         tokenAddresses = [weth];
         feedAddresses = [ethUsdPriceFeed];
         address owner = msg.sender;
         vm.prank(owner);
-        DSCEngine mockDsce = new DSCEngine(
+        NESTEngine mockDsce = new NESTEngine(
             tokenAddresses,
             feedAddresses,
             address(mockDsc)
@@ -427,7 +427,7 @@ contract DSCEngineTest is StdCheats, Test {
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
         // Act/Assert
-        vm.expectRevert(DSCEngine.DSCEngine__HealthFactorNotImproved.selector);
+        vm.expectRevert(NESTEngine.NESTEngine__HealthFactorNotImproved.selector);
         mockDsce.liquidate(weth, user, debtToCover);
         vm.stopPrank();
     }
@@ -436,40 +436,40 @@ contract DSCEngineTest is StdCheats, Test {
         ERC20Mock(weth).mint(liquidator, collateralToCover);
 
         vm.startPrank(liquidator);
-        ERC20Mock(weth).approve(address(dsce), collateralToCover);
-        dsce.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
-        dsc.approve(address(dsce), amountToMint);
+        ERC20Mock(weth).approve(address(neste), collateralToCover);
+        neste.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
+        nest.approve(address(neste), amountToMint);
 
-        vm.expectRevert(DSCEngine.DSCEngine__HealthFactorOk.selector);
-        dsce.liquidate(weth, user, amountToMint);
+        vm.expectRevert(NESTEngine.NESTEngine__HealthFactorOk.selector);
+        neste.liquidate(weth, user, amountToMint);
         vm.stopPrank();
     }
 
     modifier liquidated() {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
         vm.stopPrank();
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
 
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
-        uint256 userHealthFactor = dsce.getHealthFactor(user);
+        uint256 userHealthFactor = neste.getHealthFactor(user);
 
         ERC20Mock(weth).mint(liquidator, collateralToCover);
 
         vm.startPrank(liquidator);
-        ERC20Mock(weth).approve(address(dsce), collateralToCover);
-        dsce.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
-        dsc.approve(address(dsce), amountToMint);
-        dsce.liquidate(weth, user, amountToMint); // We are covering their whole debt
+        ERC20Mock(weth).approve(address(neste), collateralToCover);
+        neste.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
+        nest.approve(address(neste), amountToMint);
+        neste.liquidate(weth, user, amountToMint); // We are covering their whole debt
         vm.stopPrank();
         _;
     }
 
     function testLiquidationPayoutIsCorrect() public liquidated {
         uint256 liquidatorWethBalance = ERC20Mock(weth).balanceOf(liquidator);
-        uint256 expectedWeth = dsce.getTokenAmountFromUsd(weth, amountToMint)
-            + (dsce.getTokenAmountFromUsd(weth, amountToMint) / dsce.getLiquidationBonus());
+        uint256 expectedWeth = neste.getTokenAmountFromUsd(weth, amountToMint)
+            + (neste.getTokenAmountFromUsd(weth, amountToMint) / neste.getLiquidationBonus());
         uint256 hardCodedExpected = 6111111111111111110;
         assertEq(liquidatorWethBalance, hardCodedExpected);
         assertEq(liquidatorWethBalance, expectedWeth);
@@ -477,25 +477,25 @@ contract DSCEngineTest is StdCheats, Test {
 
     function testUserStillHasSomeEthAfterLiquidation() public liquidated {
         // Get how much WETH the user lost
-        uint256 amountLiquidated = dsce.getTokenAmountFromUsd(weth, amountToMint)
-            + (dsce.getTokenAmountFromUsd(weth, amountToMint) / dsce.getLiquidationBonus());
+        uint256 amountLiquidated = neste.getTokenAmountFromUsd(weth, amountToMint)
+            + (neste.getTokenAmountFromUsd(weth, amountToMint) / neste.getLiquidationBonus());
 
-        uint256 usdAmountLiquidated = dsce.getUsdValue(weth, amountLiquidated);
-        uint256 expectedUserCollateralValueInUsd = dsce.getUsdValue(weth, amountCollateral) - (usdAmountLiquidated);
+        uint256 usdAmountLiquidated = neste.getUsdValue(weth, amountLiquidated);
+        uint256 expectedUserCollateralValueInUsd = neste.getUsdValue(weth, amountCollateral) - (usdAmountLiquidated);
 
-        (, uint256 userCollateralValueInUsd) = dsce.getAccountInformation(user);
+        (, uint256 userCollateralValueInUsd) = neste.getAccountInformation(user);
         uint256 hardCodedExpectedValue = 70000000000000000020;
         assertEq(userCollateralValueInUsd, expectedUserCollateralValueInUsd);
         assertEq(userCollateralValueInUsd, hardCodedExpectedValue);
     }
 
     function testLiquidatorTakesOnUsersDebt() public liquidated {
-        (uint256 liquidatorDscMinted,) = dsce.getAccountInformation(liquidator);
+        (uint256 liquidatorDscMinted,) = neste.getAccountInformation(liquidator);
         assertEq(liquidatorDscMinted, amountToMint);
     }
 
     function testUserHasNoMoreDebt() public liquidated {
-        (uint256 userDscMinted,) = dsce.getAccountInformation(user);
+        (uint256 userDscMinted,) = neste.getAccountInformation(user);
         assertEq(userDscMinted, 0);
     }
 
@@ -503,58 +503,58 @@ contract DSCEngineTest is StdCheats, Test {
     // View & Pure Function Tests //
     //////////////////////////////////
     function testGetCollateralTokenPriceFeed() public {
-        address priceFeed = dsce.getCollateralTokenPriceFeed(weth);
+        address priceFeed = neste.getCollateralTokenPriceFeed(weth);
         assertEq(priceFeed, ethUsdPriceFeed);
     }
 
     function testGetCollateralTokens() public {
-        address[] memory collateralTokens = dsce.getCollateralTokens();
+        address[] memory collateralTokens = neste.getCollateralTokens();
         assertEq(collateralTokens[0], weth);
     }
 
     function testGetMinHealthFactor() public {
-        uint256 minHealthFactor = dsce.getMinHealthFactor();
+        uint256 minHealthFactor = neste.getMinHealthFactor();
         assertEq(minHealthFactor, MIN_HEALTH_FACTOR);
     }
 
     function testGetLiquidationThreshold() public {
-        uint256 liquidationThreshold = dsce.getLiquidationThreshold();
+        uint256 liquidationThreshold = neste.getLiquidationThreshold();
         assertEq(liquidationThreshold, LIQUIDATION_THRESHOLD);
     }
 
     function testGetAccountCollateralValueFromInformation() public depositedCollateral {
-        (, uint256 collateralValue) = dsce.getAccountInformation(user);
-        uint256 expectedCollateralValue = dsce.getUsdValue(weth, amountCollateral);
+        (, uint256 collateralValue) = neste.getAccountInformation(user);
+        uint256 expectedCollateralValue = neste.getUsdValue(weth, amountCollateral);
         assertEq(collateralValue, expectedCollateralValue);
     }
 
     function testGetCollateralBalanceOfUser() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateral(weth, amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateral(weth, amountCollateral);
         vm.stopPrank();
-        uint256 collateralBalance = dsce.getCollateralBalanceOfUser(user, weth);
+        uint256 collateralBalance = neste.getCollateralBalanceOfUser(user, weth);
         assertEq(collateralBalance, amountCollateral);
     }
 
     function testGetAccountCollateralValue() public {
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(dsce), amountCollateral);
-        dsce.depositCollateral(weth, amountCollateral);
+        ERC20Mock(weth).approve(address(neste), amountCollateral);
+        neste.depositCollateral(weth, amountCollateral);
         vm.stopPrank();
-        uint256 collateralValue = dsce.getAccountCollateralValue(user);
-        uint256 expectedCollateralValue = dsce.getUsdValue(weth, amountCollateral);
+        uint256 collateralValue = neste.getAccountCollateralValue(user);
+        uint256 expectedCollateralValue = neste.getUsdValue(weth, amountCollateral);
         assertEq(collateralValue, expectedCollateralValue);
     }
 
     function testGetDsc() public {
-        address dscAddress = dsce.getDsc();
-        assertEq(dscAddress, address(dsc));
+        address nestAddress = neste.getDsc();
+        assertEq(nestAddress, address(nest));
     }
 
     function testLiquidationPrecision() public {
         uint256 expectedLiquidationPrecision = 100;
-        uint256 actualLiquidationPrecision = dsce.getLiquidationPrecision();
+        uint256 actualLiquidationPrecision = neste.getLiquidationPrecision();
         assertEq(actualLiquidationPrecision, expectedLiquidationPrecision);
     }
 
@@ -562,12 +562,12 @@ contract DSCEngineTest is StdCheats, Test {
     // function testInvariantBreaks() public depositedCollateralAndMintedDsc {
     //     MockV3Aggregator(ethUsdPriceFeed).updateAnswer(0);
 
-    //     uint256 totalSupply = dsc.totalSupply();
-    //     uint256 wethDeposted = ERC20Mock(weth).balanceOf(address(dsce));
-    //     uint256 wbtcDeposited = ERC20Mock(wbtc).balanceOf(address(dsce));
+    //     uint256 totalSupply = nest.totalSupply();
+    //     uint256 wethDeposted = ERC20Mock(weth).balanceOf(address(neste));
+    //     uint256 wbtcDeposited = ERC20Mock(wbtc).balanceOf(address(neste));
 
-    //     uint256 wethValue = dsce.getUsdValue(weth, wethDeposted);
-    //     uint256 wbtcValue = dsce.getUsdValue(wbtc, wbtcDeposited);
+    //     uint256 wethValue = neste.getUsdValue(weth, wethDeposted);
+    //     uint256 wbtcValue = neste.getUsdValue(wbtc, wbtcDeposited);
 
     //     console.log("wethValue: %s", wethValue);
     //     console.log("wbtcValue: %s", wbtcValue);

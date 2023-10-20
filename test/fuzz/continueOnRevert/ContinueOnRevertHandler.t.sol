@@ -9,8 +9,8 @@ pragma solidity ^0.8.19;
 // import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
 // import {MockV3Aggregator} from "../../mocks/MockV3Aggregator.sol";
-// import {DSCEngine, AggregatorV3Interface} from "../../../src/DSCEngine.sol";
-// import {DecentralizedStableCoin} from "../../../src/DecentralizedStableCoin.sol";
+// import {NESTEngine, AggregatorV3Interface} from "../../../src/NESTEngine.sol";
+// import {NestStableCoin} from "../../../src/NestStableCoin.sol";
 // import {Randomish, EnumerableSet} from "../Randomish.sol";
 // import {MockV3Aggregator} from "../../mocks/MockV3Aggregator.sol";
 // import {console} from "forge-std/console.sol";
@@ -20,8 +20,8 @@ pragma solidity ^0.8.19;
 //     using Randomish for EnumerableSet.AddressSet;
 
 //     // Deployed contracts to interact with
-//     DSCEngine public dscEngine;
-//     DecentralizedStableCoin public dsc;
+//     NESTEngine public nestEngine;
+//     NestStableCoin public nest;
 //     MockV3Aggregator public ethUsdPriceFeed;
 //     MockV3Aggregator public btcUsdPriceFeed;
 //     ERC20Mock public weth;
@@ -30,26 +30,26 @@ pragma solidity ^0.8.19;
 //     // Ghost Variables
 //     uint96 public constant MAX_DEPOSIT_SIZE = type(uint96).max;
 
-//     constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
-//         dscEngine = _dscEngine;
-//         dsc = _dsc;
+//     constructor(NESTEngine _nestEngine, NestStableCoin _nest) {
+//         nestEngine = _nestEngine;
+//         nest = _nest;
 
-//         address[] memory collateralTokens = dscEngine.getCollateralTokens();
+//         address[] memory collateralTokens = nestEngine.getCollateralTokens();
 //         weth = ERC20Mock(collateralTokens[0]);
 //         wbtc = ERC20Mock(collateralTokens[1]);
 
 //         ethUsdPriceFeed = MockV3Aggregator(
-//             dscEngine.getCollateralTokenPriceFeed(address(weth))
+//             nestEngine.getCollateralTokenPriceFeed(address(weth))
 //         );
 //         btcUsdPriceFeed = MockV3Aggregator(
-//             dscEngine.getCollateralTokenPriceFeed(address(wbtc))
+//             nestEngine.getCollateralTokenPriceFeed(address(wbtc))
 //         );
 //     }
 
 //     // FUNCTOINS TO INTERACT WITH
 
 //     ///////////////
-//     // DSCEngine //
+//     // NESTEngine //
 //     ///////////////
 //     function mintAndDepositCollateral(
 //         uint256 collateralSeed,
@@ -58,7 +58,7 @@ pragma solidity ^0.8.19;
 //         amountCollateral = bound(amountCollateral, 0, MAX_DEPOSIT_SIZE);
 //         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
 //         collateral.mint(msg.sender, amountCollateral);
-//         dscEngine.depositCollateral(address(collateral), amountCollateral);
+//         nestEngine.depositCollateral(address(collateral), amountCollateral);
 //     }
 
 //     function redeemCollateral(
@@ -67,17 +67,17 @@ pragma solidity ^0.8.19;
 //     ) public {
 //         amountCollateral = bound(amountCollateral, 0, MAX_DEPOSIT_SIZE);
 //         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-//         dscEngine.redeemCollateral(address(collateral), amountCollateral);
+//         nestEngine.redeemCollateral(address(collateral), amountCollateral);
 //     }
 
 //     function burnDsc(uint256 amountDsc) public {
-//         amountDsc = bound(amountDsc, 0, dsc.balanceOf(msg.sender));
-//         dsc.burn(amountDsc);
+//         amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
+//         nest.burn(amountDsc);
 //     }
 
 //     function mintDsc(uint256 amountDsc) public {
 //         amountDsc = bound(amountDsc, 0, MAX_DEPOSIT_SIZE);
-//         dsc.mint(msg.sender, amountDsc);
+//         nest.mint(msg.sender, amountDsc);
 //     }
 
 //     function liquidate(
@@ -86,7 +86,7 @@ pragma solidity ^0.8.19;
 //         uint256 debtToCover
 //     ) public {
 //         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-//         dscEngine.liquidate(
+//         nestEngine.liquidate(
 //             address(collateral),
 //             userToBeLiquidated,
 //             debtToCover
@@ -94,12 +94,12 @@ pragma solidity ^0.8.19;
 //     }
 
 //     /////////////////////////////
-//     // DecentralizedStableCoin //
+//     // NestStableCoin //
 //     /////////////////////////////
 //     function transferDsc(uint256 amountDsc, address to) public {
-//         amountDsc = bound(amountDsc, 0, dsc.balanceOf(msg.sender));
+//         amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
 //         vm.prank(msg.sender);
-//         dsc.transfer(to, amountDsc);
+//         nest.transfer(to, amountDsc);
 //     }
 
 //     /////////////////////////////
@@ -113,7 +113,7 @@ pragma solidity ^0.8.19;
 //         int256 intNewPrice = 0;
 //         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
 //         MockV3Aggregator priceFeed = MockV3Aggregator(
-//             dscEngine.getCollateralTokenPriceFeed(address(collateral))
+//             nestEngine.getCollateralTokenPriceFeed(address(collateral))
 //         );
 
 //         priceFeed.updateAnswer(intNewPrice);
@@ -131,8 +131,8 @@ pragma solidity ^0.8.19;
 //     }
 
 //     function callSummary() external view {
-//         console.log("Weth total deposited", weth.balanceOf(address(dscEngine)));
-//         console.log("Wbtc total deposited", wbtc.balanceOf(address(dscEngine)));
-//         console.log("Total supply of DSC", dsc.totalSupply());
+//         console.log("Weth total deposited", weth.balanceOf(address(nestEngine)));
+//         console.log("Wbtc total deposited", wbtc.balanceOf(address(nestEngine)));
+//         console.log("Total supply of NEST", nest.totalSupply());
 //     }
 // }

@@ -1,10 +1,21 @@
 // SPDX-License-Identifier: MIT
+
 pragma solidity 0.8.19;
 
 import {ERC20Burnable, ERC20} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MockFailedTransferFrom is ERC20Burnable, Ownable {
+/*
+ * @title NestStableCoin
+ * @author Neel CLaudel
+ * Collateral: Exogenous
+ * Minting (Stability Mechanism): Decentralized (Algorithmic)
+ * Value (Relative Stability): Anchored (Pegged to USD)
+ * Collateral Type: Crypto
+ *
+ * This is the contract meant to be owned by NESTEngine. It is a ERC20 token that can be minted and burned by the NestEngine smart contract.
+ */
+contract NestStableCoin is ERC20Burnable, Ownable {
     error NestStableCoin__AmountMustBeMoreThanZero();
     error NestStableCoin__BurnAmountExceedsBalance();
     error NestStableCoin__NotZeroAddress();
@@ -29,16 +40,38 @@ contract MockFailedTransferFrom is ERC20Burnable, Ownable {
         super.burn(_amount);
     }
 
-    function mint(address account, uint256 amount) public {
-        _mint(account, amount);
-    }
-
-    function transferFrom(address, /*sender*/ address, /*recipient*/ uint256 /*amount*/ )
-        public
-        pure
-        override
-        returns (bool)
-    {
-        return false;
+    function mint(address _to, uint256 _amount) external onlyOwner returns (bool) {
+        if (_to == address(0)) {
+            revert NestStableCoin__NotZeroAddress();
+        }
+        if (_amount <= 0) {
+            revert NestStableCoin__AmountMustBeMoreThanZero();
+        }
+        _mint(_to, _amount);
+        return true;
     }
 }
+
+
+// This is considered an Exogenous, Decentralized, Anchored (pegged), Crypto Collateralized low volitility coin
+
+// Layout of Contract:
+// version
+// imports
+// errors
+// interfaces, libraries, contracts
+// Type declarations
+// State variables
+// Events
+// Modifiers
+// Functions
+
+// Layout of Functions:
+// constructor
+// receive function (if exists)
+// fallback function (if exists)
+// external
+// public
+// internal
+// private
+// view & pure functions

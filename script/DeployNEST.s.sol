@@ -3,14 +3,14 @@ pragma solidity ^0.8.19;
 
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "./HelperConfig.s.sol";
-import {DecentralizedStableCoin} from "../src/DecentralizedStableCoin.sol";
-import {DSCEngine} from "../src/DSCEngine.sol";
+import {NestStableCoin} from "../src/NestStableCoin.sol";
+import {NESTEngine} from "../src/NESTEngine.sol";
 
-contract DeployDSC is Script {
+contract DeployNEST is Script {
     address[] public tokenAddresses;
     address[] public priceFeedAddresses;
 
-    function run() external returns (DecentralizedStableCoin, DSCEngine, HelperConfig) {
+    function run() external returns (NestStableCoin, NESTEngine, HelperConfig) {
         HelperConfig helperConfig = new HelperConfig(); // This comes with our mocks!
 
         (address wethUsdPriceFeed, address wbtcUsdPriceFeed, address weth, address wbtc, uint256 deployerKey) =
@@ -19,14 +19,14 @@ contract DeployDSC is Script {
         priceFeedAddresses = [wethUsdPriceFeed, wbtcUsdPriceFeed];
 
         vm.startBroadcast(deployerKey);
-        DecentralizedStableCoin dsc = new DecentralizedStableCoin();
-        DSCEngine dscEngine = new DSCEngine(
+        NestStableCoin nest = new NestStableCoin();
+        NESTEngine nestEngine = new NESTEngine(
             tokenAddresses,
             priceFeedAddresses,
-            address(dsc)
+            address(nest)
         );
-        dsc.transferOwnership(address(dscEngine));
+        nest.transferOwnership(address(nestEngine));
         vm.stopBroadcast();
-        return (dsc, dscEngine, helperConfig);
+        return (nest, nestEngine, helperConfig);
     }
 }

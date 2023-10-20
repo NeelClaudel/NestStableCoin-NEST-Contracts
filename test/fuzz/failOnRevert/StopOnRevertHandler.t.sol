@@ -7,8 +7,8 @@ import {Test} from "forge-std/Test.sol";
 import {ERC20Mock} from "@openzeppelin/contracts/mocks/ERC20Mock.sol";
 
 import {MockV3Aggregator} from "../../mocks/MockV3Aggregator.sol";
-import {DSCEngine, AggregatorV3Interface} from "../../../src/DSCEngine.sol";
-import {DecentralizedStableCoin} from "../../../src/DecentralizedStableCoin.sol";
+import {NESTEngine, AggregatorV3Interface} from "../../../src/NESTEngine.sol";
+import {NestStableCoin} from "../../../src/NestStableCoin.sol";
 import {MockV3Aggregator} from "../../mocks/MockV3Aggregator.sol";
 import {console} from "forge-std/console.sol";
 
@@ -16,8 +16,8 @@ contract StopOnRevertHandler is Test {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // Deployed contracts to interact with
-    DSCEngine public dscEngine;
-    DecentralizedStableCoin public dsc;
+    NESTEngine public nestEngine;
+    NestStableCoin public nest;
     MockV3Aggregator public ethUsdPriceFeed;
     MockV3Aggregator public btcUsdPriceFeed;
     ERC20Mock public weth;
@@ -26,22 +26,22 @@ contract StopOnRevertHandler is Test {
     // Ghost Variables
     uint96 public constant MAX_DEPOSIT_SIZE = type(uint96).max;
 
-    constructor(DSCEngine _dscEngine, DecentralizedStableCoin _dsc) {
-        dscEngine = _dscEngine;
-        dsc = _dsc;
+    constructor(NESTEngine _nestEngine, NestStableCoin _nest) {
+        nestEngine = _nestEngine;
+        nest = _nest;
 
-        address[] memory collateralTokens = dscEngine.getCollateralTokens();
+        address[] memory collateralTokens = nestEngine.getCollateralTokens();
         weth = ERC20Mock(collateralTokens[0]);
         wbtc = ERC20Mock(collateralTokens[1]);
 
-        ethUsdPriceFeed = MockV3Aggregator(dscEngine.getCollateralTokenPriceFeed(address(weth)));
-        btcUsdPriceFeed = MockV3Aggregator(dscEngine.getCollateralTokenPriceFeed(address(wbtc)));
+        ethUsdPriceFeed = MockV3Aggregator(nestEngine.getCollateralTokenPriceFeed(address(weth)));
+        btcUsdPriceFeed = MockV3Aggregator(nestEngine.getCollateralTokenPriceFeed(address(wbtc)));
     }
 
     // FUNCTOINS TO INTERACT WITH
 
     ///////////////
-    // DSCEngine //
+    // NESTEngine //
     ///////////////
     function mintAndDepositCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         // must be more than 0
@@ -50,59 +50,59 @@ contract StopOnRevertHandler is Test {
 
         vm.startPrank(msg.sender);
         collateral.mint(msg.sender, amountCollateral);
-        collateral.approve(address(dscEngine), amountCollateral);
-        dscEngine.depositCollateral(address(collateral), amountCollateral);
+        collateral.approve(address(nestEngine), amountCollateral);
+        nestEngine.depositCollateral(address(collateral), amountCollateral);
         vm.stopPrank();
     }
 
     function redeemCollateral(uint256 collateralSeed, uint256 amountCollateral) public {
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-        uint256 maxCollateral = dscEngine.getCollateralBalanceOfUser(msg.sender, address(collateral));
+        uint256 maxCollateral = nestEngine.getCollateralBalanceOfUser(msg.sender, address(collateral));
 
         amountCollateral = bound(amountCollateral, 0, maxCollateral);
         if (amountCollateral == 0) {
             return;
         }
-        dscEngine.redeemCollateral(address(collateral), amountCollateral);
+        nestEngine.redeemCollateral(address(collateral), amountCollateral);
     }
 
     function burnDsc(uint256 amountDsc) public {
         // Must burn more than 0
-        amountDsc = bound(amountDsc, 0, dsc.balanceOf(msg.sender));
+        amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
         if (amountDsc == 0) {
             return;
         }
-        dscEngine.burnDsc(amountDsc);
+        nestEngine.burnDsc(amountDsc);
     }
 
-    // Only the DSCEngine can mint DSC!
+    // Only the NESTEngine can mint NEST!
     // function mintDsc(uint256 amountDsc) public {
     //     amountDsc = bound(amountDsc, 0, MAX_DEPOSIT_SIZE);
-    //     vm.prank(dsc.owner());
-    //     dsc.mint(msg.sender, amountDsc);
+    //     vm.prank(nest.owner());
+    //     nest.mint(msg.sender, amountDsc);
     // }
 
     function liquidate(uint256 collateralSeed, address userToBeLiquidated, uint256 debtToCover) public {
-        uint256 minHealthFactor = dscEngine.getMinHealthFactor();
-        uint256 userHealthFactor = dscEngine.getHealthFactor(userToBeLiquidated);
+        uint256 minHealthFactor = nestEngine.getMinHealthFactor();
+        uint256 userHealthFactor = nestEngine.getHealthFactor(userToBeLiquidated);
         if (userHealthFactor >= minHealthFactor) {
             return;
         }
         debtToCover = bound(debtToCover, 1, uint256(type(uint96).max));
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-        dscEngine.liquidate(address(collateral), userToBeLiquidated, debtToCover);
+        nestEngine.liquidate(address(collateral), userToBeLiquidated, debtToCover);
     }
 
     /////////////////////////////
-    // DecentralizedStableCoin //
+    // NestStableCoin //
     /////////////////////////////
     function transferDsc(uint256 amountDsc, address to) public {
         if (to == address(0)) {
             to = address(1);
         }
-        amountDsc = bound(amountDsc, 0, dsc.balanceOf(msg.sender));
+        amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
         vm.prank(msg.sender);
-        dsc.transfer(to, amountDsc);
+        nest.transfer(to, amountDsc);
     }
 
     /////////////////////////////
@@ -111,7 +111,7 @@ contract StopOnRevertHandler is Test {
     function updateCollateralPrice(uint96 newPrice, uint256 collateralSeed) public {
         int256 intNewPrice = int256(uint256(newPrice));
         ERC20Mock collateral = _getCollateralFromSeed(collateralSeed);
-        MockV3Aggregator priceFeed = MockV3Aggregator(dscEngine.getCollateralTokenPriceFeed(address(collateral)));
+        MockV3Aggregator priceFeed = MockV3Aggregator(nestEngine.getCollateralTokenPriceFeed(address(collateral)));
 
         priceFeed.updateAnswer(intNewPrice);
     }
