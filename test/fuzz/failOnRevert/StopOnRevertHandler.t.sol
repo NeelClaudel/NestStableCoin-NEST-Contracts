@@ -66,20 +66,20 @@ contract StopOnRevertHandler is Test {
         nestEngine.redeemCollateral(address(collateral), amountCollateral);
     }
 
-    function burnDsc(uint256 amountDsc) public {
+    function burnNest(uint256 amountNest) public {
         // Must burn more than 0
-        amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
-        if (amountDsc == 0) {
+        amountNest = bound(amountNest, 0, nest.balanceOf(msg.sender));
+        if (amountNest == 0) {
             return;
         }
-        nestEngine.burnDsc(amountDsc);
+        nestEngine.burnNest(amountNest);
     }
 
     // Only the NESTEngine can mint NEST!
-    // function mintDsc(uint256 amountDsc) public {
-    //     amountDsc = bound(amountDsc, 0, MAX_DEPOSIT_SIZE);
+    // function mintNest(uint256 amountNest) public {
+    //     amountNest = bound(amountNest, 0, MAX_DEPOSIT_SIZE);
     //     vm.prank(nest.owner());
-    //     nest.mint(msg.sender, amountDsc);
+    //     nest.mint(msg.sender, amountNest);
     // }
 
     function liquidate(uint256 collateralSeed, address userToBeLiquidated, uint256 debtToCover) public {
@@ -96,13 +96,13 @@ contract StopOnRevertHandler is Test {
     /////////////////////////////
     // NestStableCoin //
     /////////////////////////////
-    function transferDsc(uint256 amountDsc, address to) public {
+    function transferNest(uint256 amountNest, address to) public {
         if (to == address(0)) {
             to = address(1);
         }
-        amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
+        amountNest = bound(amountNest, 0, nest.balanceOf(msg.sender));
         vm.prank(msg.sender);
-        nest.transfer(to, amountDsc);
+        nest.transfer(to, amountNest);
     }
 
     /////////////////////////////

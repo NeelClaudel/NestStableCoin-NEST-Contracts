@@ -72,7 +72,7 @@ contract StopOnRevertInvariants is StdInvariant, Test {
         neste.getLiquidationThreshold();
         neste.getMinHealthFactor();
         neste.getPrecision();
-        neste.getDsc();
+        neste.getNest();
         // neste.getTokenAmountFromUsd();
         // neste.getCollateralTokenPriceFeed();
         // neste.getCollateralBalanceOfUser();

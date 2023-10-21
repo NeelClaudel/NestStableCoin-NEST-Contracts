@@ -70,14 +70,14 @@ pragma solidity ^0.8.19;
 //         nestEngine.redeemCollateral(address(collateral), amountCollateral);
 //     }
 
-//     function burnDsc(uint256 amountDsc) public {
-//         amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
-//         nest.burn(amountDsc);
+//     function burnNest(uint256 amountNest) public {
+//         amountNest = bound(amountNest, 0, nest.balanceOf(msg.sender));
+//         nest.burn(amountNest);
 //     }
 
-//     function mintDsc(uint256 amountDsc) public {
-//         amountDsc = bound(amountDsc, 0, MAX_DEPOSIT_SIZE);
-//         nest.mint(msg.sender, amountDsc);
+//     function mintNest(uint256 amountNest) public {
+//         amountNest = bound(amountNest, 0, MAX_DEPOSIT_SIZE);
+//         nest.mint(msg.sender, amountNest);
 //     }
 
 //     function liquidate(
@@ -96,10 +96,10 @@ pragma solidity ^0.8.19;
 //     /////////////////////////////
 //     // NestStableCoin //
 //     /////////////////////////////
-//     function transferDsc(uint256 amountDsc, address to) public {
-//         amountDsc = bound(amountDsc, 0, nest.balanceOf(msg.sender));
+//     function transferNest(uint256 amountNest, address to) public {
+//         amountNest = bound(amountNest, 0, nest.balanceOf(msg.sender));
 //         vm.prank(msg.sender);
-//         nest.transfer(to, amountDsc);
+//         nest.transfer(to, amountNest);
 //     }
 
 //     /////////////////////////////

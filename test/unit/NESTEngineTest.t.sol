@@ -107,25 +107,25 @@ contract NESTEngineTest is StdCheats, Test {
         // Arrange - Setup
         address owner = msg.sender;
         vm.prank(owner);
-        MockFailedTransferFrom mockDsc = new MockFailedTransferFrom();
-        tokenAddresses = [address(mockDsc)];
+        MockFailedTransferFrom mockNest = new MockFailedTransferFrom();
+        tokenAddresses = [address(mockNest)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        NESTEngine mockDsce = new NESTEngine(
+        NESTEngine mockNeste = new NESTEngine(
             tokenAddresses,
             feedAddresses,
-            address(mockDsc)
+            address(mockNest)
         );
-        mockDsc.mint(user, amountCollateral);
+        mockNest.mint(user, amountCollateral);
 
         vm.prank(owner);
-        mockDsc.transferOwnership(address(mockDsce));
+        mockNest.transferOwnership(address(mockNeste));
         // Arrange - User
         vm.startPrank(user);
-        ERC20Mock(address(mockDsc)).approve(address(mockDsce), amountCollateral);
+        ERC20Mock(address(mockNest)).approve(address(mockNeste), amountCollateral);
         // Act / Assert
         vm.expectRevert(NESTEngine.NESTEngine__TransferFailed.selector);
-        mockDsce.depositCollateral(address(mockDsc), amountCollateral);
+        mockNeste.depositCollateral(address(mockNest), amountCollateral);
         vm.stopPrank();
     }
 
@@ -160,17 +160,17 @@ contract NESTEngineTest is StdCheats, Test {
     }
 
     function testCanDepositedCollateralAndGetAccountInfo() public depositedCollateral {
-        (uint256 totalDscMinted, uint256 collateralValueInUsd) = neste.getAccountInformation(user);
+        (uint256 totalNestMinted, uint256 collateralValueInUsd) = neste.getAccountInformation(user);
         uint256 expectedDepositedAmount = neste.getTokenAmountFromUsd(weth, collateralValueInUsd);
-        assertEq(totalDscMinted, 0);
+        assertEq(totalNestMinted, 0);
         assertEq(expectedDepositedAmount, amountCollateral);
     }
 
     ///////////////////////////////////////
-    // depositCollateralAndMintDsc Tests //
+    // depositCollateralAndMintNest Tests //
     ///////////////////////////////////////
 
-    function testRevertsIfMintedDscBreaksHealthFactor() public {
+    function testRevertsIfMintedNestBreaksHealthFactor() public {
         (, int256 price,,,) = MockV3Aggregator(ethUsdPriceFeed).latestRoundData();
         amountToMint = (amountCollateral * (uint256(price) * neste.getAdditionalFeedPrecision())) / neste.getPrecision();
         vm.startPrank(user);
@@ -179,55 +179,55 @@ contract NESTEngineTest is StdCheats, Test {
         uint256 expectedHealthFactor =
             neste.calculateHealthFactor(amountToMint, neste.getUsdValue(weth, amountCollateral));
         vm.expectRevert(abi.encodeWithSelector(NESTEngine.NESTEngine__BreaksHealthFactor.selector, expectedHealthFactor));
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
     }
 
-    modifier depositedCollateralAndMintedDsc() {
+    modifier depositedCollateralAndMintedNest() {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
         _;
     }
 
-    function testCanMintWithDepositedCollateral() public depositedCollateralAndMintedDsc {
+    function testCanMintWithDepositedCollateral() public depositedCollateralAndMintedNest {
         uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, amountToMint);
     }
 
     ///////////////////////////////////
-    // mintDsc Tests //
+    // mintNest Tests //
     ///////////////////////////////////
     // This test needs it's own custom setup
     function testRevertsIfMintFails() public {
         // Arrange - Setup
-        MockFailedMintNEST mockDsc = new MockFailedMintNEST();
+        MockFailedMintNEST mockNest = new MockFailedMintNEST();
         tokenAddresses = [weth];
         feedAddresses = [ethUsdPriceFeed];
         address owner = msg.sender;
         vm.prank(owner);
-        NESTEngine mockDsce = new NESTEngine(
+        NESTEngine mockNeste = new NESTEngine(
             tokenAddresses,
             feedAddresses,
-            address(mockDsc)
+            address(mockNest)
         );
-        mockDsc.transferOwnership(address(mockDsce));
+        mockNest.transferOwnership(address(mockNeste));
         // Arrange - User
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
+        ERC20Mock(weth).approve(address(mockNeste), amountCollateral);
 
         vm.expectRevert(NESTEngine.NESTEngine__MintFailed.selector);
-        mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        mockNeste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
     }
 
     function testRevertsIfMintAmountIsZero() public {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
-        neste.mintDsc(0);
+        neste.mintNest(0);
         vm.stopPrank();
     }
 
@@ -244,41 +244,41 @@ contract NESTEngineTest is StdCheats, Test {
         uint256 expectedHealthFactor =
             neste.calculateHealthFactor(amountToMint, neste.getUsdValue(weth, amountCollateral));
         vm.expectRevert(abi.encodeWithSelector(NESTEngine.NESTEngine__BreaksHealthFactor.selector, expectedHealthFactor));
-        neste.mintDsc(amountToMint);
+        neste.mintNest(amountToMint);
         vm.stopPrank();
     }
 
-    function testCanMintDsc() public depositedCollateral {
+    function testCanMintNest() public depositedCollateral {
         vm.prank(user);
-        neste.mintDsc(amountToMint);
+        neste.mintNest(amountToMint);
 
         uint256 userBalance = nest.balanceOf(user);
         assertEq(userBalance, amountToMint);
     }
 
     ///////////////////////////////////
-    // burnDsc Tests //
+    // burnNest Tests //
     ///////////////////////////////////
 
     function testRevertsIfBurnAmountIsZero() public {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
-        neste.burnDsc(0);
+        neste.burnNest(0);
         vm.stopPrank();
     }
 
     function testCantBurnMoreThanUserHas() public {
         vm.prank(user);
         vm.expectRevert();
-        neste.burnDsc(1);
+        neste.burnNest(1);
     }
 
-    function testCanBurnDsc() public depositedCollateralAndMintedDsc {
+    function testCanBurnNest() public depositedCollateralAndMintedNest {
         vm.startPrank(user);
         nest.approve(address(neste), amountToMint);
-        neste.burnDsc(amountToMint);
+        neste.burnNest(amountToMint);
         vm.stopPrank();
 
         uint256 userBalance = nest.balanceOf(user);
@@ -294,33 +294,33 @@ contract NESTEngineTest is StdCheats, Test {
         // Arrange - Setup
         address owner = msg.sender;
         vm.prank(owner);
-        MockFailedTransfer mockDsc = new MockFailedTransfer();
-        tokenAddresses = [address(mockDsc)];
+        MockFailedTransfer mockNest = new MockFailedTransfer();
+        tokenAddresses = [address(mockNest)];
         feedAddresses = [ethUsdPriceFeed];
         vm.prank(owner);
-        NESTEngine mockDsce = new NESTEngine(
+        NESTEngine mockNeste = new NESTEngine(
             tokenAddresses,
             feedAddresses,
-            address(mockDsc)
+            address(mockNest)
         );
-        mockDsc.mint(user, amountCollateral);
+        mockNest.mint(user, amountCollateral);
 
         vm.prank(owner);
-        mockDsc.transferOwnership(address(mockDsce));
+        mockNest.transferOwnership(address(mockNeste));
         // Arrange - User
         vm.startPrank(user);
-        ERC20Mock(address(mockDsc)).approve(address(mockDsce), amountCollateral);
+        ERC20Mock(address(mockNest)).approve(address(mockNeste), amountCollateral);
         // Act / Assert
-        mockDsce.depositCollateral(address(mockDsc), amountCollateral);
+        mockNeste.depositCollateral(address(mockNest), amountCollateral);
         vm.expectRevert(NESTEngine.NESTEngine__TransferFailed.selector);
-        mockDsce.redeemCollateral(address(mockDsc), amountCollateral);
+        mockNeste.redeemCollateral(address(mockNest), amountCollateral);
         vm.stopPrank();
     }
 
     function testRevertsIfRedeemAmountIsZero() public {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
         neste.redeemCollateral(weth, 0);
         vm.stopPrank();
@@ -342,23 +342,23 @@ contract NESTEngineTest is StdCheats, Test {
         vm.stopPrank();
     }
     ///////////////////////////////////
-    // redeemCollateralForDsc Tests //
+    // redeemCollateralForNest Tests //
     //////////////////////////////////
 
-    function testMustRedeemMoreThanZero() public depositedCollateralAndMintedDsc {
+    function testMustRedeemMoreThanZero() public depositedCollateralAndMintedNest {
         vm.startPrank(user);
         nest.approve(address(neste), amountToMint);
         vm.expectRevert(NESTEngine.NESTEngine__NeedsMoreThanZero.selector);
-        neste.redeemCollateralForDsc(weth, 0, amountToMint);
+        neste.redeemCollateralForNest(weth, 0, amountToMint);
         vm.stopPrank();
     }
 
     function testCanRedeemDepositedCollateral() public {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         nest.approve(address(neste), amountToMint);
-        neste.redeemCollateralForDsc(weth, amountCollateral, amountToMint);
+        neste.redeemCollateralForNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
 
         uint256 userBalance = nest.balanceOf(user);
@@ -369,7 +369,7 @@ contract NESTEngineTest is StdCheats, Test {
     // healthFactor Tests //
     ////////////////////////
 
-    function testProperlyReportsHealthFactor() public depositedCollateralAndMintedDsc {
+    function testProperlyReportsHealthFactor() public depositedCollateralAndMintedNest {
         uint256 expectedHealthFactor = 100 ether;
         uint256 healthFactor = neste.getHealthFactor(user);
         // $100 minted with $20,000 collateral at 50% liquidation threshold
@@ -379,7 +379,7 @@ contract NESTEngineTest is StdCheats, Test {
         assertEq(healthFactor, expectedHealthFactor);
     }
 
-    function testHealthFactorCanGoBelowOne() public depositedCollateralAndMintedDsc {
+    function testHealthFactorCanGoBelowOne() public depositedCollateralAndMintedNest {
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
         // Rememeber, we need $150 at all times if we have $100 of debt
 
@@ -397,21 +397,21 @@ contract NESTEngineTest is StdCheats, Test {
     // This test needs it's own setup
     function testMustImproveHealthFactorOnLiquidation() public {
         // Arrange - Setup
-        MockMoreDebtNEST mockDsc = new MockMoreDebtNEST(ethUsdPriceFeed);
+        MockMoreDebtNEST mockNest = new MockMoreDebtNEST(ethUsdPriceFeed);
         tokenAddresses = [weth];
         feedAddresses = [ethUsdPriceFeed];
         address owner = msg.sender;
         vm.prank(owner);
-        NESTEngine mockDsce = new NESTEngine(
+        NESTEngine mockNeste = new NESTEngine(
             tokenAddresses,
             feedAddresses,
-            address(mockDsc)
+            address(mockNest)
         );
-        mockDsc.transferOwnership(address(mockDsce));
+        mockNest.transferOwnership(address(mockNeste));
         // Arrange - User
         vm.startPrank(user);
-        ERC20Mock(weth).approve(address(mockDsce), amountCollateral);
-        mockDsce.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        ERC20Mock(weth).approve(address(mockNeste), amountCollateral);
+        mockNeste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
 
         // Arrange - Liquidator
@@ -419,25 +419,25 @@ contract NESTEngineTest is StdCheats, Test {
         ERC20Mock(weth).mint(liquidator, collateralToCover);
 
         vm.startPrank(liquidator);
-        ERC20Mock(weth).approve(address(mockDsce), collateralToCover);
+        ERC20Mock(weth).approve(address(mockNeste), collateralToCover);
         uint256 debtToCover = 10 ether;
-        mockDsce.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
-        mockDsc.approve(address(mockDsce), debtToCover);
+        mockNeste.depositCollateralAndMintNest(weth, collateralToCover, amountToMint);
+        mockNest.approve(address(mockNeste), debtToCover);
         // Act
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
         MockV3Aggregator(ethUsdPriceFeed).updateAnswer(ethUsdUpdatedPrice);
         // Act/Assert
         vm.expectRevert(NESTEngine.NESTEngine__HealthFactorNotImproved.selector);
-        mockDsce.liquidate(weth, user, debtToCover);
+        mockNeste.liquidate(weth, user, debtToCover);
         vm.stopPrank();
     }
 
-    function testCantLiquidateGoodHealthFactor() public depositedCollateralAndMintedDsc {
+    function testCantLiquidateGoodHealthFactor() public depositedCollateralAndMintedNest {
         ERC20Mock(weth).mint(liquidator, collateralToCover);
 
         vm.startPrank(liquidator);
         ERC20Mock(weth).approve(address(neste), collateralToCover);
-        neste.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
+        neste.depositCollateralAndMintNest(weth, collateralToCover, amountToMint);
         nest.approve(address(neste), amountToMint);
 
         vm.expectRevert(NESTEngine.NESTEngine__HealthFactorOk.selector);
@@ -448,7 +448,7 @@ contract NESTEngineTest is StdCheats, Test {
     modifier liquidated() {
         vm.startPrank(user);
         ERC20Mock(weth).approve(address(neste), amountCollateral);
-        neste.depositCollateralAndMintDsc(weth, amountCollateral, amountToMint);
+        neste.depositCollateralAndMintNest(weth, amountCollateral, amountToMint);
         vm.stopPrank();
         int256 ethUsdUpdatedPrice = 18e8; // 1 ETH = $18
 
@@ -459,7 +459,7 @@ contract NESTEngineTest is StdCheats, Test {
 
         vm.startPrank(liquidator);
         ERC20Mock(weth).approve(address(neste), collateralToCover);
-        neste.depositCollateralAndMintDsc(weth, collateralToCover, amountToMint);
+        neste.depositCollateralAndMintNest(weth, collateralToCover, amountToMint);
         nest.approve(address(neste), amountToMint);
         neste.liquidate(weth, user, amountToMint); // We are covering their whole debt
         vm.stopPrank();
@@ -490,13 +490,13 @@ contract NESTEngineTest is StdCheats, Test {
     }
 
     function testLiquidatorTakesOnUsersDebt() public liquidated {
-        (uint256 liquidatorDscMinted,) = neste.getAccountInformation(liquidator);
-        assertEq(liquidatorDscMinted, amountToMint);
+        (uint256 liquidatorNestMinted,) = neste.getAccountInformation(liquidator);
+        assertEq(liquidatorNestMinted, amountToMint);
     }
 
     function testUserHasNoMoreDebt() public liquidated {
-        (uint256 userDscMinted,) = neste.getAccountInformation(user);
-        assertEq(userDscMinted, 0);
+        (uint256 userNestMinted,) = neste.getAccountInformation(user);
+        assertEq(userNestMinted, 0);
     }
 
     ///////////////////////////////////
@@ -547,8 +547,8 @@ contract NESTEngineTest is StdCheats, Test {
         assertEq(collateralValue, expectedCollateralValue);
     }
 
-    function testGetDsc() public {
-        address nestAddress = neste.getDsc();
+    function testGetNest() public {
+        address nestAddress = neste.getNest();
         assertEq(nestAddress, address(nest));
     }
 
@@ -559,7 +559,7 @@ contract NESTEngineTest is StdCheats, Test {
     }
 
     // How do we adjust our invariant tests for this?
-    // function testInvariantBreaks() public depositedCollateralAndMintedDsc {
+    // function testInvariantBreaks() public depositedCollateralAndMintedNest {
     //     MockV3Aggregator(ethUsdPriceFeed).updateAnswer(0);
 
     //     uint256 totalSupply = nest.totalSupply();

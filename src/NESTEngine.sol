@@ -108,29 +108,29 @@ contract NESTEngine is ReentrancyGuard {
     /*
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
      * @param amountCollateral: The amount of collateral you're depositing
-     * @param amountDscToMint: The amount of NEST you want to mint
+     * @param amountNestToMint: The amount of NEST you want to mint
      * @notice This function will deposit your collateral and mint NEST in one transaction
      */
-    function depositCollateralAndMintDsc(
+    function depositCollateralAndMintNest(
         address tokenCollateralAddress,
         uint256 amountCollateral,
-        uint256 amountDscToMint
+        uint256 amountNestToMint
     ) external {
         depositCollateral(tokenCollateralAddress, amountCollateral);
-        mintDsc(amountDscToMint);
+        mintNest(amountNestToMint);
     }
 
     /*
      * @param tokenCollateralAddress: The ERC20 token address of the collateral you're depositing
      * @param amountCollateral: The amount of collateral you're depositing
-     * @param amountDscToBurn: The amount of NEST you want to burn
+     * @param amountNestToBurn: The amount of NEST you want to burn
      * @notice This function will withdraw your collateral and burn NEST in one transaction
      */
-    function redeemCollateralForDsc(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountDscToBurn)
+    function redeemCollateralForNest(address tokenCollateralAddress, uint256 amountCollateral, uint256 amountNestToBurn)
         external
         moreThanZero(amountCollateral)
     {
-        _burnDsc(amountDscToBurn, msg.sender, msg.sender);
+        _burnNest(amountNestToBurn, msg.sender, msg.sender);
         _redeemCollateral(tokenCollateralAddress, amountCollateral, msg.sender, msg.sender);
         revertIfHealthFactorIsBroken(msg.sender);
     }
@@ -155,8 +155,8 @@ contract NESTEngine is ReentrancyGuard {
      * @dev you might want to use this if you're nervous you might get liquidated and want to just burn
      * you NEST but keep your collateral in.
      */
-    function burnDsc(uint256 amount) external moreThanZero(amount) {
-        _burnDsc(amount, msg.sender, msg.sender);
+    function burnNest(uint256 amount) external moreThanZero(amount) {
+        _burnNest(amount, msg.sender, msg.sender);
         revertIfHealthFactorIsBroken(msg.sender); // I don't think this would ever hit...
     }
 
@@ -192,7 +192,7 @@ contract NESTEngine is ReentrancyGuard {
         // Burn NEST equal to debtToCover
         // Figure out how much collateral to recover based on how much burnt
         _redeemCollateral(collateral, tokenAmountFromDebtCovered + bonusCollateral, user, msg.sender);
-        _burnDsc(debtToCover, user, msg.sender);
+        _burnNest(debtToCover, user, msg.sender);
 
         uint256 endingUserHealthFactor = _healthFactor(user);
         // This conditional should never hit, but just in case
@@ -206,13 +206,13 @@ contract NESTEngine is ReentrancyGuard {
     // Public Functions
     ///////////////////
     /*
-     * @param amountDscToMint: The amount of NEST you want to mint
+     * @param amountNestToMint: The amount of NEST you want to mint
      * You can only mint NEST if you hav enough collateral
      */
-    function mintDsc(uint256 amountDscToMint) public moreThanZero(amountDscToMint) nonReentrant {
-        s_NESTMinted[msg.sender] += amountDscToMint;
+    function mintNest(uint256 amountNestToMint) public moreThanZero(amountNestToMint) nonReentrant {
+        s_NESTMinted[msg.sender] += amountNestToMint;
         revertIfHealthFactorIsBroken(msg.sender);
-        bool minted = i_nest.mint(msg.sender, amountDscToMint);
+        bool minted = i_nest.mint(msg.sender, amountNestToMint);
 
         if (minted != true) {
             revert NESTEngine__MintFailed();
@@ -251,15 +251,15 @@ contract NESTEngine is ReentrancyGuard {
         }
     }
 
-    function _burnDsc(uint256 amountDscToBurn, address onBehalfOf, address nestFrom) private {
-        s_NESTMinted[onBehalfOf] -= amountDscToBurn;
+    function _burnNest(uint256 amountNestToBurn, address onBehalfOf, address nestFrom) private {
+        s_NESTMinted[onBehalfOf] -= amountNestToBurn;
 
-        bool success = i_nest.transferFrom(nestFrom, address(this), amountDscToBurn);
+        bool success = i_nest.transferFrom(nestFrom, address(this), amountNestToBurn);
         // This conditional is hypothetically unreachable
         if (!success) {
             revert NESTEngine__TransferFailed();
         }
-        i_nest.burn(amountDscToBurn);
+        i_nest.burn(amountNestToBurn);
     }
 
     //////////////////////////////
@@ -269,15 +269,15 @@ contract NESTEngine is ReentrancyGuard {
     function _getAccountInformation(address user)
         private
         view
-        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+        returns (uint256 totalNestMinted, uint256 collateralValueInUsd)
     {
-        totalDscMinted = s_NESTMinted[user];
+        totalNestMinted = s_NESTMinted[user];
         collateralValueInUsd = getAccountCollateralValue(user);
     }
 
     function _healthFactor(address user) private view returns (uint256) {
-        (uint256 totalDscMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
-        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+        (uint256 totalNestMinted, uint256 collateralValueInUsd) = _getAccountInformation(user);
+        return _calculateHealthFactor(totalNestMinted, collateralValueInUsd);
     }
 
     function _getUsdValue(address token, uint256 amount) private view returns (uint256) {
@@ -290,14 +290,14 @@ contract NESTEngine is ReentrancyGuard {
         return ((uint256(price) * ADDITIONAL_FEED_PRECISION) * amount) / PRECISION;
     }
 
-    function _calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+    function _calculateHealthFactor(uint256 totalNestMinted, uint256 collateralValueInUsd)
         internal
         pure
         returns (uint256)
     {
-        if (totalDscMinted == 0) return type(uint256).max;
+        if (totalNestMinted == 0) return type(uint256).max;
         uint256 collateralAdjustedForThreshold = (collateralValueInUsd * LIQUIDATION_THRESHOLD) / LIQUIDATION_PRECISION;
-        return (collateralAdjustedForThreshold * PRECISION) / totalDscMinted;
+        return (collateralAdjustedForThreshold * PRECISION) / totalNestMinted;
     }
 
     function revertIfHealthFactorIsBroken(address user) internal view {
@@ -312,18 +312,18 @@ contract NESTEngine is ReentrancyGuard {
     // External & Public View & Pure Functions
     ////////////////////////////////////////////////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
-    function calculateHealthFactor(uint256 totalDscMinted, uint256 collateralValueInUsd)
+    function calculateHealthFactor(uint256 totalNestMinted, uint256 collateralValueInUsd)
         external
         pure
         returns (uint256)
     {
-        return _calculateHealthFactor(totalDscMinted, collateralValueInUsd);
+        return _calculateHealthFactor(totalNestMinted, collateralValueInUsd);
     }
 
     function getAccountInformation(address user)
         external
         view
-        returns (uint256 totalDscMinted, uint256 collateralValueInUsd)
+        returns (uint256 totalNestMinted, uint256 collateralValueInUsd)
     {
         return _getAccountInformation(user);
     }
@@ -386,7 +386,7 @@ contract NESTEngine is ReentrancyGuard {
         return s_collateralTokens;
     }
 
-    function getDsc() external view returns (address) {
+    function getNest() external view returns (address) {
         return address(i_nest);
     }
 

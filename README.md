@@ -3,9 +3,9 @@
 This is a Work in progress of the Nest Stable Coin using the Rust Foundry library for crafting deployment of Solidity Smart contract. Latest testnet version deployed on Sepolia Network and verified buy Etherscan.io.
 Addresses :
 
-- [NESTEngine - 0x563be8f1e4cf4131a0e561e4f148db4142127a3d](https://sepolia.etherscan.io/address/0x563be8f1e4cf4131a0e561e4f148db4142127a3d)
+- [NESTEngine - 0x3c23c5762a42874f6b4e1482dda2c614ead7c037](https://sepolia.etherscan.io/address/0x3c23c5762a42874f6b4e1482dda2c614ead7c037)
 - [Nest Stable Coin - 0x1ff36b645d5e3e94588e3cca67d76549ea287b13](https://sepolia.etherscan.io/address/0x1ff36b645d5e3e94588e3cca67d76549ea287b13)
-- [Oracle Lib - 0x3d06ba5471c1164f7eae6ba01013c0693e7a5d04](https://sepolia.etherscan.io/address/0x3d06ba5471c1164f7eae6ba01013c0693e7a5d04)
+- [Oracle Lib - 0x97ca4cc1873e574aa30a6d8d13bf229f6b217c6f](https://sepolia.etherscan.io/address/0x97ca4cc1873e574aa30a6d8d13bf229f6b217c6f)
 
 # About
 
